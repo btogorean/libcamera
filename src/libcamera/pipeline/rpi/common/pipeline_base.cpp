@@ -1035,19 +1035,10 @@ bool CameraData::enumerateVideoDevices(MediaLink *link, const std::string &front
 		return false;
 
 	/* Find the source pad for this Video Mux or Bridge device. */
-	const MediaPad *sourcePad = nullptr;
+	std::vector<const MediaPad *> sourcePads;
 	for (const MediaPad *pad : entity->pads()) {
-		if (pad->flags() & MEDIA_PAD_FL_SOURCE) {
-			/*
-			 * We can only deal with devices that have a single source
-			 * pad. If this device has multiple source pads, ignore it
-			 * and this branch in the cascade.
-			 */
-			if (sourcePad)
-				return false;
-
-			sourcePad = pad;
-		}
+		if (pad->flags() & MEDIA_PAD_FL_SOURCE)
+			sourcePads.push_back(pad);
 	}
 
 	LOG(RPI, Debug) << "Found video mux device " << entity->name()
@@ -1060,8 +1051,12 @@ bool CameraData::enumerateVideoDevices(MediaLink *link, const std::string &front
 	 * Iterate through all the sink pad links down the cascade to find any
 	 * other Video Mux and Bridge devices.
 	 */
-	for (MediaLink *l : sourcePad->links()) {
-		frontendFound = enumerateVideoDevices(l, frontend);
+	for (const MediaPad *sourcePad : sourcePads) {
+		for (MediaLink *l : sourcePad->links()) {
+			frontendFound = enumerateVideoDevices(l, frontend);
+			if (frontendFound)
+				break;
+		}
 		if (frontendFound)
 			break;
 	}
